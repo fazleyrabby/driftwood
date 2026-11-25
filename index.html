@@ -142,8 +142,20 @@
   .tip{position:fixed;left:0;top:0;pointer-events:none;background:var(--ink);color:var(--paper);font-size:13px;padding:4px 8px;border:2px solid var(--paper);white-space:nowrap;z-index:10}
   .tip small{display:block;color:#d8c8a8;font-size:12px}.tip em{display:block;color:#f59a86;font-style:normal;font-size:12px}
   .float{position:fixed;left:0;top:0;pointer-events:none;font-family:Silkscreen,monospace;font-size:11px;color:var(--paper);text-shadow:1px 1px 0 #1a1018,-1px 0 0 #1a1018,0 -1px 0 #1a1018,1px 0 0 #1a1018;white-space:nowrap}
+  .guide{position:fixed;right:14px;top:200px;width:236px;background:var(--paper);border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);font-size:13px;line-height:1.3;z-index:2}
+  .guide h4{margin:0;padding:5px 8px;background:var(--ink);color:var(--gold);font-family:Silkscreen,monospace;font-size:11px;font-weight:normal;display:flex;justify-content:space-between;cursor:pointer;user-select:none}
+  .guide h4 span{color:var(--paper)}
+  .guide .gb{padding:7px 9px 8px}
+  .guide.min .gb{display:none}
+  .guide .now b{display:block;font-size:14px;margin-bottom:2px}
+  .guide .now small{display:block;opacity:.78}
+  .guide .next{margin-top:6px;padding-top:5px;border-top:2px dashed #e0cfa8;opacity:.55;font-size:12px}
+  .guide .bar{height:4px;background:#e0cfa8;margin-top:7px}.guide .bar i{display:block;height:100%;background:#6aa23c}
+  .guide.flash{animation:gflash .6s steps(2) 2}
+  @keyframes gflash{50%{background:#d8eec0}}
+  body.hud-off .guide,body.noguide .guide{display:none}
   @media (max-width:1180px){.status b{display:none}}
-  @media (max-width:760px){.status b{display:none}.slot{width:36px;height:36px}.slot img{width:24px;height:24px}.mini{top:auto;bottom:6px;width:150px;height:150px}.mini canvas{width:100px;height:100px}}
+  @media (max-width:760px){.guide{top:auto;bottom:8px;left:8px;right:auto;width:210px}.status b{display:none}.slot{width:36px;height:36px}.slot img{width:24px;height:24px}.mini{top:auto;bottom:6px;width:150px;height:150px}.mini canvas{width:100px;height:100px}}
 </style>
 </head>
 <body>
@@ -156,6 +168,7 @@
   </div>
   <div class="hotbar" id="hotbar"></div>
   <div class="mini"><canvas id="mini" width="96" height="96" title="Click to look there"></canvas></div>
+  <div class="guide" id="guide"><h4 id="gHead" title="Click to fold (J)">SURVIVAL GUIDE <span id="gCount">0/9</span></h4><div class="gb"><div class="now" id="gNow"></div><div class="next" id="gNext"></div><div class="bar"><i id="gBar"></i></div></div></div>
 </div>
 <button class="hudtab" id="hudTab" title="Show HUD (H)"><img class="px" id="hudTabIcon" alt=""></button>
 <div class="panel bag hidden" id="bag"><h3>Bag <button data-close="bag">x</button></h3><div class="grid" id="bagGrid"></div></div>
@@ -167,6 +180,7 @@
   <label>Edge shine</label><div class="seg" data-key="hi"><button data-v="1">On</button><button data-v="0">Off</button></div>
   <label>Graphics quality</label><div class="seg" data-key="quality"><button data-v="low">Low</button><button data-v="med">Medium</button><button data-v="high">High</button></div>
   <label>Survival</label><div class="seg" data-key="mode"><button data-v="normal">Normal</button><button data-v="relaxed">Relaxed</button></div>
+  <label>Survival guide</label><div class="seg" data-key="guide"><button data-v="1">On</button><button data-v="0">Off</button></div>
   <label>Edge scroll</label><div class="seg" data-key="edge"><button data-v="1">On</button><button data-v="0">Off</button></div>
   <button class="wide" id="sCard">Save a postcard (P)</button><button class="wide" id="sSave">Save now</button><button class="wide" id="sNew">New island...</button>
 </div>
@@ -195,7 +209,7 @@
   <div>Hold the <b>spear</b> and click shallow water to fish</div>
   <div>Crabs come out at night. Click one to catch it</div>
   <div>Build a <b>signal fire</b> on the hilltop, light it when a ship passes</div>
-  <div><kbd>P</kbd>postcard &nbsp;Saves automatically</div>
+  <div><kbd>P</kbd>postcard &nbsp;<kbd>J</kbd>fold the guide &nbsp;Saves automatically</div>
   <div><kbd>1-8</kbd>hotbar (the selected tool is held) &nbsp;<kbd>I</kbd>bag</div>
   <div><kbd>C</kbd>crafting (shift+click: craft 5)</div>
   <div><kbd>B</kbd>build: <kbd>R</kbd>rotate, <kbd>Shift</kbd>place more, right-click cancel</div>
@@ -237,7 +251,7 @@ const toastEl=$('toast');let toastT=0;
 function toast(msg){toastEl.textContent=msg;toastEl.classList.add('show');toastT=2.4}
 
 /* settings persist per browser */
-const SET={px:0,outline:1,ocolor:'auto',hi:true,depth:0,quality:'high',edge:true,sound:true,hud:true,mode:'normal'};
+const SET={px:0,outline:1,ocolor:'auto',hi:true,depth:0,quality:'high',edge:true,sound:true,hud:true,mode:'normal',guide:true};
 try{Object.assign(SET,JSON.parse(localStorage.getItem('driftwood.settings')||'{}'))}catch(e){}
 function saveSettings(){try{localStorage.setItem('driftwood.settings',JSON.stringify(SET))}catch(e){}}
 
@@ -1093,7 +1107,7 @@ function useSlot(k){const s=INV[k];if(!s||DEAD)return;const f=FOOD[s.id];
   if(!f){SFX.nope();toast(ITEMS[s.id].n+" can't be used yet");return}
   if(P.eat)return;s.n--;if(!s.n)INV[k]=null;renderInv();
   P.eat={t:0,f,id:s.id,done:false};SFX[f.sfx]()}
-function finishEat(e){const f=e.f;
+function finishEat(e){const f=e.f;if(e.id==='coconut'||e.id==='water')EV.drank=1;
   if(SET.mode!=='relaxed'){MT.hunger=clamp(MT.hunger+f.hunger,0,100);MT.thirst=clamp(MT.thirst+f.thirst,0,100);
     const bits=[];if(f.thirst>0)bits.push('+'+f.thirst+' thirst');if(f.hunger>0)bits.push('+'+f.hunger+' food');floatText(bits.join('  '),P.x,H(P.x,P.z)+1.9,P.z);
     for(const m of['hunger','thirst'])MEL[m].d.classList.add('up');setTimeout(()=>{MEL.hunger.d.classList.remove('up');MEL.thirst.d.classList.remove('up')},500)}
@@ -1106,7 +1120,7 @@ function updateSurvival(dt,gh){
   if(P.rest){P.rest.t+=gh;P.rest.sleep=night||P.rest.sleep&&HOUR<6.5;
     if((zT-=dt)<=0&&P.rest.sleep){zT=1.1;floatText('z',P.x,H(P.x,P.z)+0.9,P.z)}
     const full=MT.energy>=99.5;
-    if(P.rest.sleep&&!night&&HOUR>=6.4&&(full||relaxed))wake('Good morning');
+    if(P.rest.sleep&&!night&&HOUR>=6.4&&(full||relaxed)){EV.slept=1;wake('Good morning')}
     else if(!P.rest.sleep&&(full&&MT.warmth>90||relaxed&&P.rest.t>2))wake('Rested');
     else if(!relaxed&&(MT.hunger<6||MT.thirst<6))wake(MT.thirst<6?'Woke up thirsty':'Woke up hungry');
     if(P.rest&&P.rest.sleep&&P.rest.t>(P.rest.place.shelter?3:4))ST.rested=8}
@@ -1189,7 +1203,7 @@ function updateCrafting(dt){if(DEAD||!CQ.length){P.craft=null;return}const r=CQ[
     P.craftWalk=false;P.craft={r,t:0,hitT:0.2};updateHeld()}
   const c=P.craft;c.t+=dt;if((c.hitT-=dt)<=0){c.hitT=0.45;SFX[r.sfx]();if(r.st==='fire'&&Math.random()<0.5){const F=nearestFire(P.x,P.z);PARTFX.spark(F.x,F.y+0.2,F.z)}}
   if(c.t>=r.t){CQ.shift();P.craft=null;finishCraft(r);renderInv()}}
-function finishCraft(r){if(r.tool)wear(r.tool);STATS.crafted++;
+function finishCraft(r){if(r.tool)wear(r.tool);STATS.crafted++;if(r.out)EV.made[r.out]=1;
   const n=r.n||1;addItem(r.out,n);SFX.pop();floatText('+'+n+' '+ITEMS[r.out].n,P.x,H(P.x,P.z)+1.9,P.z)}
 const POPS=[];
 function updatePops(dt){for(let k=POPS.length-1;k>=0;k--){const o=POPS[k];o.t+=dt;const u=Math.min(1,o.t/0.45),c=1.7;
@@ -1582,7 +1596,7 @@ function applySettings(){
   if(q.shadow&&sun.shadow.mapSize.x!==q.shadow){sun.shadow.mapSize.set(q.shadow,q.shadow);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}}
   for(const f of FOLIAGE)f.im.count=Math.floor(f.n*q.fol);pLimit=q.pmax;
   if(AU.master)AU.master.gain.value=SET.sound?0.5:0;
-  document.body.classList.toggle('hud-off',!SET.hud);document.body.classList.toggle('relaxed',SET.mode==='relaxed');
+  document.body.classList.toggle('hud-off',!SET.hud);document.body.classList.toggle('relaxed',SET.mode==='relaxed');document.body.classList.toggle('noguide',!SET.guide);
   resize();syncSettingsUI();saveSettings()}
 function syncSettingsUI(){$('sPx').value=SET.px;$('vPx').textContent=SET.px?SET.px+'px':'Auto';
   document.querySelectorAll('#settings .seg').forEach(seg=>{const key=seg.dataset.key,v=SET[key];
@@ -1590,7 +1604,7 @@ function syncSettingsUI(){$('sPx').value=SET.px;$('vPx').textContent=SET.px?SET.
   const sb=dockBtn.sound;if(sb){sb.firstChild.src=SET.sound?UI.sound:UI.mute;sb.classList.toggle('on',SET.sound)}}
 $('sPx').addEventListener('input',e=>{SET.px=+e.target.value;applySettings()});
 document.querySelectorAll('#settings .seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const key=seg.dataset.key,v=b.dataset.v;
-  SET[key]=key==='hi'||key==='edge'?v==='1':key==='outline'||key==='depth'?+v:v;SFX.click();applySettings()}));
+  SET[key]=key==='hi'||key==='edge'||key==='guide'?v==='1':key==='outline'||key==='depth'?+v:v;SFX.click();applySettings()}));
 
 /* ================================================================ minimap */
 const mini=$('mini'),miniCtx=mini.getContext('2d'),miniImg=miniCtx.createImageData(GN,GN);
@@ -1624,7 +1638,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(PAUSED)return;audi
   else if(k==='u')useSlot(selSlot);
   else if(k==='f9'){skipTo((HOUR+1)%24,'+1 hour');e.preventDefault()}else if(k==='f10'){skipTo(6.2,'Skip to dawn');e.preventDefault()}
   else if(k==='f')interact();else if(k==='f6'){fsU.fogOn.value=fsU.fogOn.value?0:1;e.preventDefault()}
-  else if(k===' '){if(P.fish)strike();else findCastaway();e.preventDefault()}else if(k==='p'){wantCard=true}else if(k==='f8'){forceStorm();e.preventDefault()}else if(k==='i')togglePanel('bag');else if(k==='c')togglePanel('craft');else if(k==='b'){endPlace();togglePanel('build')}else if(k==='r'&&PLACE&&!PLACE.demo){PLACE.rot=(PLACE.rot+1)%4;SFX.click()}else if(k==='o')togglePanel('settings');
+  else if(k===' '){if(P.fish)strike();else findCastaway();e.preventDefault()}else if(k==='p'){wantCard=true}else if(k==='j'){GUIDE.min=!GUIDE.min;renderGuide()}else if(k==='f8'){forceStorm();e.preventDefault()}else if(k==='i')togglePanel('bag');else if(k==='c')togglePanel('craft');else if(k==='b'){endPlace();togglePanel('build')}else if(k==='r'&&PLACE&&!PLACE.demo){PLACE.rot=(PLACE.rot+1)%4;SFX.click()}else if(k==='o')togglePanel('settings');
   else if(k==='h')setHud(!SET.hud);else if(k==='escape'&&P.fish){endFish()}else if(k==='escape'&&PLACE){endPlace()}else if(k==='escape'){const open=PANELS.some(p=>!$(p).classList.contains('hidden'));if(open)PANELS.forEach(p=>$(p).classList.add('hidden'));else if(P.orders.length||P.job){cancelOrders();toast('Stopped')}}
   else if(k>='1'&&k<='8'){selSlot=+k-1;renderInv()}
   else if(k==='='||k==='+')setZoom(zoomI+1);else if(k==='-')setZoom(zoomI-1);
@@ -1870,7 +1884,7 @@ function saveGame(){if(DEAD||PAUSED)return;try{
   const washed=WASHED.filter(w=>{const r=RES.find(o=>o.kind==='drift'&&Math.abs(o.x-w.x)<1e-6&&Math.abs(o.z-w.z)<1e-6);return r&&!r.gone});
   const structs=STRUCTS.map(s=>({type:s.type,i0:s.i0,j0:s.j0,rot:s.rot,state:s.state,prog:s.prog,hp:s.hp,water:s.water||0,items:s.items||null,out:s.fire?.out||false,burn:s.fire?.burn||0}));
   const data={v:1,seed:SEED,GS,P:{x:P.x,z:P.z,hat:!!P.hat},MT,ST,INV,SEEN:[...SEEN],selSlot,fog:packFog(),res,extra,washed,structs,
-    fire0:FIRES[0].out,WX:{plan:WX.plan,planDay:WX.planDay,lastStorm:WX.lastStorm},SHIPS:{plan:SHIPS.plan,planDay:SHIPS.planDay,last:SHIPS.last,rescued:SHIPS.rescued},STATS,dawnIdx};
+    fire0:FIRES[0].out,WX:{plan:WX.plan,planDay:WX.planDay,lastStorm:WX.lastStorm},SHIPS:{plan:SHIPS.plan,planDay:SHIPS.planDay,last:SHIPS.last,rescued:SHIPS.rescued},STATS,dawnIdx,EV,guide:GUIDE.i,gmin:GUIDE.min};
   localStorage.setItem(SAVEKEY,JSON.stringify(data));savedFlash()}catch(e){console.warn('save failed',e)}}
 function readSave(){try{const t=localStorage.getItem(SAVEKEY);if(!t)return null;const d=JSON.parse(t);return d&&d.v===1&&d.seed===SEED?d:null}catch(e){return null}}
 function loadGame(d){
@@ -1884,6 +1898,7 @@ function loadGame(d){
   for(const e of d.extra){const r=e.loot?makeLoot(e.x,e.z,e.items,e.loot):makePouch(e.x,e.z,e.items,e.drop?0xb08a5a:0x9a6e40);r.drop=e.drop;if(e.label)r.label=e.label;if(e.hint)r.hint=e.hint}
   for(const o of d.structs){const def=BUILD[o.type];if(!def)continue;const s=createSite(o.type,footprint(def,o.i0,o.j0,o.rot),o.rot,true);s.prog=o.prog;s.body.scale.y=0.06+0.94*o.prog;
     if(o.items)s.items=o.items;if(o.state==='done'){completeStruct(s,true);s.water=o.water;setCatcher(s);if(s.fire){s.fire.out=o.out;s.fire.burn=o.burn}}s.hp=o.hp;setDamage(s)}
+  if(d.EV)Object.assign(EV,d.EV);GUIDE.i=d.guide||0;GUIDE.min=!!d.gmin;renderGuide();
   FIRES[0].out=d.fire0;Object.assign(WX,d.WX);Object.assign(SHIPS,d.SHIPS);Object.assign(STATS,d.STATS);dawnIdx=d.dawnIdx;
   follow=true;target.set(P.x,target.y,P.z);updateFog(true);renderInv();miniDirty=true;loaded=true}
 function savedFlash(){const e=$('saved');e.classList.remove('hidden');clearTimeout(savedFlash.t);savedFlash.t=setTimeout(()=>e.classList.add('hidden'),1400)}
@@ -1918,6 +1933,29 @@ function forceStorm(){WX.plan=WX.plan.filter(e=>e.kind==='heat'||e.b<GS||e.a>GS+
 $('sCard').onclick=()=>{wantCard=true};$('sSave').onclick=()=>{saveGame();toast('Saved')};$('sNew').onclick=()=>newIsland();
 RES0=RES.length;
 
+/* ================================================================ survival guide: the core loop, one step at a time, ticking itself off */
+const EV={drank:0,made:{},slept:0};
+const doneS=t=>STRUCTS.some(s=>s.state==='done'&&(Array.isArray(t)?t.includes(s.type):s.type===t));
+const STEPS=[
+  {t:'Drink a coconut',h:'Click a palm to shake down coconuts, then right-click the coconut in your hotbar.',ok:()=>EV.drank},
+  {t:'Twist some rope',h:'Gather fiber grass, then open Crafting (C) and make Rope from 3 fiber.',ok:()=>EV.made.rope||countItem('rope')>0},
+  {t:'Craft a stone axe',h:'Stick + stone + rope. Flint for a knife lies on the rocky hill.',ok:()=>EV.made.axe||countItem('axe')>0},
+  {t:'Build a lean-to',h:'Open Build (B): 6 sticks and 6 palm fronds. Click the ground to place it.',ok:()=>doneS(['leanto','tent'])},
+  {t:'Sleep through the night',h:'After dark, click your lean-to (or a campfire) to sleep till morning.',ok:()=>EV.slept},
+  {t:'Collect 4 palm logs',h:'Select the axe in your hotbar and click a palm to fell it (2 logs each).',ok:()=>countItem('log')>=4||doneS('signal')},
+  {t:'Make 4 thatch',h:'At a campfire, Crafting > Campfire: 2 fronds dry into 1 thatch.',ok:()=>countItem('thatch')>=4||doneS('signal')},
+  {t:'Build the signal fire',h:'Build (B) > Signal fire. It only fits on the high ground of the hilltop.',ok:()=>doneS('signal')},
+  {t:'Get rescued',h:'From day 2 ships pass in the evening. When the horn sounds, click the signal fire to light it.',ok:()=>SHIPS.rescued}];
+const GUIDE={i:0,min:false,t:0};
+function renderGuide(){const i=GUIDE.i,N=STEPS.length;$('gCount').textContent=Math.min(i,N)+'/'+N;$('gBar').style.width=(i/N*100)+'%';$('guide').classList.toggle('min',GUIDE.min);
+  if(i>=N){$('gNow').innerHTML='<b>Rescued!</b><small>You made it off the island. Keep exploring, or try a new island.</small>';$('gNext').textContent='';return}
+  $('gNow').innerHTML=`<b>${i+1}. ${STEPS[i].t}</b><small>${STEPS[i].h}</small>`;$('gNext').textContent=i+1<N?'Next: '+STEPS[i+1].t:'Last step!'}
+function updateGuide(dt){if((GUIDE.t-=dt)>0||PAUSED)return;GUIDE.t=0.5;let moved=false;
+  while(GUIDE.i<STEPS.length&&STEPS[GUIDE.i].ok()){toast('Done: '+STEPS[GUIDE.i].t);GUIDE.i++;moved=true}
+  if(moved){SFX.day();renderGuide();const g=$('guide');g.classList.remove('flash');void g.offsetWidth;g.classList.add('flash');if(GUIDE.min){GUIDE.min=false;renderGuide()}}}
+$('gHead').onclick=()=>{GUIDE.min=!GUIDE.min;SFX.click();renderGuide()};
+renderGuide();
+
 /* ================================================================ main loop */
 applySettings();setZoom(zoomI);ZM.t=1;updateFog(true);renderInv();
 let last=performance.now(),miniT=0,vitT=0,tideOverride=null;const dayEl=$('dayEl');
@@ -1933,7 +1971,7 @@ function tick(dt){TIME+=dt;
   waterY=tideOverride??0.17*Math.sin(GS*TAU/140)+WX.wind*0.07;   // the tide (spec: a third of a day); storms push the surf up
   water.position.y=waterY;waterU.waterY.value=waterY;waterU.time.value=TIME;
   updatePlayer(dt);updateCrafting(dt);updateTools(dt,gh);updateFalling(dt);updatePops(dt);updateStructs(dt);updateGhost();updateCraftBar();updateResFx(dt);updatePalms();updateFire(dt);updateParticles(dt);updateRipples(dt);updateFlyers(dt);updateRegrow(dt);
-  updateCrabs(dt);updateFlocks(dt);updateFish(dt);updateFireflies(dt);updateFootprints(dt);updateFishing(dt);updateShips(dt);updateAmbience(dt);
+  updateCrabs(dt);updateFlocks(dt);updateFish(dt);updateFireflies(dt);updateFootprints(dt);updateFishing(dt);updateShips(dt);updateAmbience(dt);updateGuide(dt);
   {const vr=Math.round(lerp(9,5,NIGHT*(torchLit?0.35:1))-WX.rain*1.5);if(vr!==VR){VR=vr;updateFog(true)}}
   if((saveT-=dt)<=0){saveT=30;saveGame()}
   {const di=Math.floor((GS/DAYSEC*24-6)/24);if(di!==lastDawnSave){if(lastDawnSave>=0)saveGame();lastDawnSave=di}}
@@ -1953,7 +1991,7 @@ function renderFrame(){if(sun.castShadow)renderer.shadowMap.needsUpdate=true;
   scene.overrideMaterial=null;cam.layers.enable(1);renderer.setRenderTarget(rtColor);renderer.render(scene,cam);
   renderer.setRenderTarget(null);renderer.render(fsScene,fsCam)}
 requestAnimationFrame(frame);
-window.__dw={H,get NIGHT(){return NIGHT},WX,SHIPS,STATS,CRABS,FLOCKS,saveGame,readSave,startGame,get PAUSED(){return PAUSED},washAshore,strike,fishClick,showEnding,setStorm:()=>forceStorm(),STRUCTS,BUILD,startPlace,createSite,footprint,canPlace,endPlace,structClick,FIRES,damage:(s,f)=>{s.hp=s.max*f;setDamage(s)},CQ,RECIPES,enqueue,PALMS,select:k=>{selSlot=k;renderInv()},FIRE,MT,ST,die:()=>{MT.health=0},get GS(){return GS},get HOUR(){return HOUR},skipTo,useSlot,get DEAD(){return DEAD},scene,rings:()=>[hoverRing,workRing],step:(sec,dt=1/30)=>{for(let t=0;t<sec;t+=dt)tick(dt)},P,order,gather,findPath,ISLET,RES,INV,addItem,get waterY(){return waterY},fsU,target,setZoom,handleClick,setTide:v=>{tideOverride=v},SET,applySettings,nearestRes};   // debug handle
+window.__dw={GUIDE,EV,H,get NIGHT(){return NIGHT},WX,SHIPS,STATS,CRABS,FLOCKS,saveGame,readSave,startGame,get PAUSED(){return PAUSED},washAshore,strike,fishClick,showEnding,setStorm:()=>forceStorm(),STRUCTS,BUILD,startPlace,createSite,footprint,canPlace,endPlace,structClick,FIRES,damage:(s,f)=>{s.hp=s.max*f;setDamage(s)},CQ,RECIPES,enqueue,PALMS,select:k=>{selSlot=k;renderInv()},FIRE,MT,ST,die:()=>{MT.health=0},get GS(){return GS},get HOUR(){return HOUR},skipTo,useSlot,get DEAD(){return DEAD},scene,rings:()=>[hoverRing,workRing],step:(sec,dt=1/30)=>{for(let t=0;t<sec;t+=dt)tick(dt)},P,order,gather,findPath,ISLET,RES,INV,addItem,get waterY(){return waterY},fsU,target,setZoom,handleClick,setTide:v=>{tideOverride=v},SET,applySettings,nearestRes};   // debug handle
 </script>
 </body>
 </html>
